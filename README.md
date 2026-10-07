@@ -130,7 +130,7 @@ You only need to do this once.
     Windows
 
     ```cmd
-    adb logcat | FINDSTR "auth%2Fphotos.native"
+    adb logcat | Select-String -SimpleMatch 'auth%2Fphotos.native'
     ```
 
     Linux/Mac
