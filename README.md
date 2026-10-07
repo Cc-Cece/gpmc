@@ -171,7 +171,7 @@ reports that the auth token is encrypted.
     Windows
 
     ```cmd
-    adb logcat | FINDSTR "auth%2Fphotos.native"
+    adb logcat | Select-String -SimpleMatch 'auth%2Fphotos.native'
     ```
 
     Linux/Mac
