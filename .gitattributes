@@ -1,2 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+tools/sync_gpmc.py text eol=lf
+gpmc.lock.json text eol=lf
+
+gpmc/** text eol=lf

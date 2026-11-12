@@ -1,18 +1,21 @@
 [build-system]
-requires = ["setuptools>=65.0.0", "wheel"]
+requires = ["setuptools>=77.0.3", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["gpmc"]
 
+[tool.setuptools.package-data]
+gpmc = ["NOTICE.md", "_licenses/*.txt"]
+
 [project]
 name = "gpmc"
-version = "0.9.0"
+version = "0.9.1.dev0"
 description = "Google Photos Mobile Client based on the reverse-engineered mobile API."
 authors = [{ name = "xob0t" }]
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE"]
+license = "MIT AND GPL-3.0-only"
+license-files = ["LICENSE", "gpmc/NOTICE.md", "gpmc/_licenses/*.txt"]
 requires-python = ">=3.11"
 keywords = [
     "google photos",
