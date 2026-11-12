@@ -1,0 +1,86 @@
+{
+  "gpmc": {
+    "commit": "11b9bae50a07992e24ac2fee556cdb52989588fb",
+    "files": {
+      "__init__.py": "46d83009d4bba69fa7ceac990381e518b5714edc090f3d0b7cf22757373aa0a5",
+      "api.py": "ea7ad5a9358999683e0ae54d11a0cb93df6c08e14b7d5978c47cc574092dbe9b",
+      "auth.py": "9b3e784affe4de76993bb8f5f4d04905a74995a876fb5ba31996b07b2c40d7e5",
+      "cli.py": "ab55f74e3f349bc860c8e82b72c1dd9c6fb4ec79b6e4c852e448fa3596afa93f",
+      "client.py": "da37ddb292c4d82ec49b0707599f39a87a55b370c69e8906d94975c60ac0e657",
+      "db.py": "7208115c6e843a37ed7b1fbee0603f13cacb39964d842e977cc6beaf137b035d",
+      "db_update_parser.py": "50c177691d57c325eacba3da9fce07b633537350154d12984620b5c26fcf5c2b",
+      "exceptions.py": "619874a8d7130e712b6a166b04c1da9b80ca8933bd6f8d8db27ce3d46f990587",
+      "hash_handler.py": "22682570c1b990d327550f469b5ec6f8089a5e614c77b4a031fe2cb3371753a6",
+      "message_types.py": "9e3f4e30aec02573218f545558a4e95670946e9716ee05bbed7ec808b02390c5",
+      "models.py": "81b03a3360308a21aad434fddbf9bdd850ddbbdbfd3b9c871e0272d559541046",
+      "utils.py": "1e1239cb71c53497381d37305fc7752cdabef253178157444f0a784c1541b586"
+    }
+  },
+  "desktop": {
+    "commit": "598eeeb5b236a5745b37cf17a02d7a8ef5dd0229",
+    "files": {
+      "__init__.py": "46d83009d4bba69fa7ceac990381e518b5714edc090f3d0b7cf22757373aa0a5",
+      "api.py": "ea7ad5a9358999683e0ae54d11a0cb93df6c08e14b7d5978c47cc574092dbe9b",
+      "auth.py": "9b3e784affe4de76993bb8f5f4d04905a74995a876fb5ba31996b07b2c40d7e5",
+      "cli.py": "ab55f74e3f349bc860c8e82b72c1dd9c6fb4ec79b6e4c852e448fa3596afa93f",
+      "client.py": "ad56898ee5d76702ef42206ecd9c95ffa8450ceafa8c6a335bd5b7d513ae6ec2",
+      "db.py": "7208115c6e843a37ed7b1fbee0603f13cacb39964d842e977cc6beaf137b035d",
+      "db_update_parser.py": "50c177691d57c325eacba3da9fce07b633537350154d12984620b5c26fcf5c2b",
+      "exceptions.py": "619874a8d7130e712b6a166b04c1da9b80ca8933bd6f8d8db27ce3d46f990587",
+      "hash_handler.py": "70853b6ef6971ebecce0882d896965148aa14ba68a3920c4bdae18446cc7d5c0",
+      "message_types.py": "9e3f4e30aec02573218f545558a4e95670946e9716ee05bbed7ec808b02390c5",
+      "models.py": "81b03a3360308a21aad434fddbf9bdd850ddbbdbfd3b9c871e0272d559541046",
+      "utils.py": "1e1239cb71c53497381d37305fc7752cdabef253178157444f0a784c1541b586"
+    },
+    "adapters_before_integration": {
+      "src/PicHarbor.Core/GooglePhotos/live_pair.py": "73c42420d51058b3d40ad9a2d9ffff3843d31f61250e44ccabaaf56c6a31856b",
+      "src/PicHarbor.Core/GooglePhotos/Embedded/gpmc_bridge.py": "9fa79255f4f576d2b6ee94bb3625529bada3a2d75c0951e6f46cbc594c1ae242"
+    }
+  },
+  "ios": {
+    "commit": "0d95a0714cde4aaf962b084a97524cf8c7ebb17a",
+    "files": {
+      "__init__.py": "46d83009d4bba69fa7ceac990381e518b5714edc090f3d0b7cf22757373aa0a5",
+      "api.py": "ea7ad5a9358999683e0ae54d11a0cb93df6c08e14b7d5978c47cc574092dbe9b",
+      "auth.py": "9b3e784affe4de76993bb8f5f4d04905a74995a876fb5ba31996b07b2c40d7e5",
+      "cli.py": "ab55f74e3f349bc860c8e82b72c1dd9c6fb4ec79b6e4c852e448fa3596afa93f",
+      "client.py": "ad56898ee5d76702ef42206ecd9c95ffa8450ceafa8c6a335bd5b7d513ae6ec2",
+      "db.py": "7208115c6e843a37ed7b1fbee0603f13cacb39964d842e977cc6beaf137b035d",
+      "db_update_parser.py": "50c177691d57c325eacba3da9fce07b633537350154d12984620b5c26fcf5c2b",
+      "exceptions.py": "619874a8d7130e712b6a166b04c1da9b80ca8933bd6f8d8db27ce3d46f990587",
+      "hash_handler.py": "70853b6ef6971ebecce0882d896965148aa14ba68a3920c4bdae18446cc7d5c0",
+      "message_types.py": "9e3f4e30aec02573218f545558a4e95670946e9716ee05bbed7ec808b02390c5",
+      "mobile.py": "6bc5f989f794d0b228426437e2be07e14f8115ba8384807761eb74ff94e6f75a",
+      "models.py": "81b03a3360308a21aad434fddbf9bdd850ddbbdbfd3b9c871e0272d559541046",
+      "utils.py": "1e1239cb71c53497381d37305fc7752cdabef253178157444f0a784c1541b586"
+    },
+    "adapters_before_integration": {
+      "Python/harbor_ios.py": "580eb83aeafa2d532a3d176dfc11c6ea246729d9a05968b95e3351e07d79238e",
+      "Python/harbor_protocol.py": "78b4f216566b33ae172d9936d4d6b6357ca993ca3e47a2610454e717e8353c24",
+      "Python/harbor_live.py": "c41b4842f478da6c3866f4df9a54a73d90364b17f2f10a1359b72d9a94f29fe3",
+      "Python/harbor_deadline.py": "043cfddc95321d41f935ead7a1ffdf048c48e402031f44e96a09ca7667e27940"
+    }
+  },
+  "android": {
+    "commit": "571538a5eab745f163d8e8a2cbefdb494e8462de",
+    "files": {
+      "__init__.py": "46d83009d4bba69fa7ceac990381e518b5714edc090f3d0b7cf22757373aa0a5",
+      "api.py": "ea7ad5a9358999683e0ae54d11a0cb93df6c08e14b7d5978c47cc574092dbe9b",
+      "auth.py": "9b3e784affe4de76993bb8f5f4d04905a74995a876fb5ba31996b07b2c40d7e5",
+      "cli.py": "ab55f74e3f349bc860c8e82b72c1dd9c6fb4ec79b6e4c852e448fa3596afa93f",
+      "client.py": "ad56898ee5d76702ef42206ecd9c95ffa8450ceafa8c6a335bd5b7d513ae6ec2",
+      "db.py": "7208115c6e843a37ed7b1fbee0603f13cacb39964d842e977cc6beaf137b035d",
+      "db_update_parser.py": "50c177691d57c325eacba3da9fce07b633537350154d12984620b5c26fcf5c2b",
+      "exceptions.py": "619874a8d7130e712b6a166b04c1da9b80ca8933bd6f8d8db27ce3d46f990587",
+      "hash_handler.py": "70853b6ef6971ebecce0882d896965148aa14ba68a3920c4bdae18446cc7d5c0",
+      "message_types.py": "9e3f4e30aec02573218f545558a4e95670946e9716ee05bbed7ec808b02390c5",
+      "mobile.py": "637be5a531ee6529e2a10afdc7a5082143ffeec0efaa848d3e1e189d494e301a",
+      "models.py": "81b03a3360308a21aad434fddbf9bdd850ddbbdbfd3b9c871e0272d559541046",
+      "utils.py": "1e1239cb71c53497381d37305fc7752cdabef253178157444f0a784c1541b586"
+    },
+    "adapters_before_integration": {
+      "app/src/main/python/picharbor_engine.py": "e450ff98a97633d1be7506c7453aea9856e8b05bef41c54f8ff21c6dc49cab4b",
+      "app/src/main/python/harbor_diagnostics.py": "cde866cb78e9428dd189d25bf7943a11533b182dbfa4b524a670fa429e2679f8"
+    }
+  }
+}

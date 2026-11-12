@@ -1,5 +1,9 @@
 # GPMC
 
+PicHarbor canonical integration: see [maintenance](docs/MAINTENANCE.md) and
+[integration record](INTEGRATION-LOG.md). This checkout contains PicHarbor additions;
+the upstream PyPI package is not a substitute for the locked consumer snapshots.
+
 Google Photos Mobile Client based on the reverse-engineered mobile API. “Mobile” refers to the API it uses, not the platforms it runs on—GPMC is a cross-platform Python library and CLI.
 
 ---

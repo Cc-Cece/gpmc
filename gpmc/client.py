@@ -1,5 +1,6 @@
 import mimetypes
 import os
+import random
 import re
 import signal
 import time
@@ -42,7 +43,7 @@ ALBUM_BATCH_SIZE = 500  # Number of items to add per API call
 
 
 LogLevel = Literal["INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"]
-UploadPhase = Literal["hashing", "checking", "uploading", "finalizing", "complete", "skipped", "error"]
+UploadPhase = Literal["hashing", "checking", "uploading", "finalizing", "complete", "skipped", "error", "retrying", "archiving"]
 
 
 class UploadOptions(TypedDict, total=False):
@@ -57,7 +58,7 @@ class UploadOptions(TypedDict, total=False):
 TargetMapping = Mapping[Path, bytes | str | None | UploadOptions]
 
 
-class UploadProgressEvent(TypedDict):
+class UploadProgressEvent(TypedDict, total=False):
     """Machine-readable progress for an upload operation."""
 
     version: int
@@ -68,6 +69,12 @@ class UploadProgressEvent(TypedDict):
     filename: str
     bytes_completed: int
     bytes_total: int
+    phase_processed: int
+    phase_total: int
+    retry_attempt: int | None
+    retry_max: int | None
+    retry_delay: float | None
+    error: str | None
 
 
 ProgressCallback = Callable[[UploadProgressEvent], None]
@@ -179,6 +186,8 @@ class Client:
         filename: str | None = None,
         skip_existing_filenames: bool = False,
         progress_callback: ProgressCallback | None = None,
+        auto_retries: int = 3,
+        retry_delay: float = 2.0,
     ) -> dict[str, str]:
         """
         Upload a single file to Google Photos.
@@ -194,6 +203,9 @@ class Client:
             delete_from_host: Whether to delete the file from host immediately after successful upload.
             filename: Custom filename to use instead of the actual filename.
             skip_existing_filenames: Skip uploading if a file with the same name already exists in local cache.
+            progress_callback: Progress callback for reporting upload status.
+            auto_retries: Number of retry attempts on transient upload failure.
+            retry_delay: Base delay in seconds before retry (random jitter will be added).
 
         Returns:
             dict[str, str]: A dictionary mapping the absolute file path to its Google Photos media key.
@@ -207,10 +219,33 @@ class Client:
         file_path = Path(file_path)
         file_progress_id = progress.add_task(description="")
         try:
+            prepared_files = getattr(self, "prepared_files", None)
+            expected = None
+            if prepared_files is not None:
+                expected = prepared_files.get(os.path.normcase(os.path.abspath(file_path)))
+                if expected is None:
+                    raise ValueError(f"File is not in the prepared upload plan: {file_path}")
+
+            def verify_prepared_file():
+                if expected is None:
+                    return
+                current = file_path.stat()
+                if (current.st_size != expected["size"] or
+                        current.st_mtime_ns // 1_000_000 != expected["modified_ms"]):
+                    raise ValueError(f"File changed after preparation; prepare a new upload plan: {file_path}")
+
+            verify_prepared_file()
             file_size = file_path.stat().st_size
             effective_filename = filename if filename else file_path.name
 
-            def report(phase: UploadPhase, completed: int = 0) -> None:
+            def report(
+                phase: UploadPhase,
+                completed: int = 0,
+                attempt: int | None = None,
+                max_retries: int | None = None,
+                delay: float | None = None,
+                error: str | None = None,
+            ) -> None:
                 if not progress_callback:
                     return
                 event: UploadProgressEvent = {
@@ -223,88 +258,118 @@ class Client:
                     "bytes_completed": completed,
                     "bytes_total": file_size,
                 }
+                if attempt is not None:
+                    event["retry_attempt"] = attempt
+                if max_retries is not None:
+                    event["retry_max"] = max_retries
+                if delay is not None:
+                    event["retry_delay"] = delay
+                if error is not None:
+                    event["error"] = error
                 try:
                     progress_callback(event)
-                except Exception as error:
-                    self.logger.warning(f"Progress callback failed: {error}")
+                except Exception as error_cb:
+                    self.logger.warning(f"Progress callback failed: {error_cb}")
 
-            if hash_value:
+            if hash_value and expected is None:
                 hash_bytes, hash_b64 = convert_sha1_hash(hash_value)
             else:
-                hash_bytes, hash_b64 = calculate_sha1_hash(file_path, progress, file_progress_id, lambda completed, _total: report("hashing", completed))
+                hash_bytes, hash_b64 = calculate_sha1_hash(file_path, progress, file_progress_id, lambda completed, _total: report("hashing", completed), expected_sha256=expected.get("sha256") if expected else None)
 
-            if not force_upload:
-                report("checking")
-                progress.update(task_id=file_progress_id, description=f"Checking: {file_path.name}")
-                if remote_media_key := self.api.find_remote_media_by_hash(hash_bytes):
-                    report("skipped", file_size)
+            max_attempts = max(1, auto_retries + 1)
+            last_exception: Exception | None = None
+
+            for attempt in range(max_attempts):
+                if attempt > 0:
+                    jitter = random.uniform(0.5, 2.5)
+                    sleep_time = (retry_delay * attempt) + jitter
+                    report("retrying", 0, attempt=attempt, max_retries=auto_retries, delay=sleep_time, error=str(last_exception))
+                    self.logger.warning(
+                        f"Retrying upload for {file_path.name} (attempt {attempt}/{auto_retries}) after {sleep_time:.1f}s due to: {last_exception}"
+                    )
+                    time.sleep(sleep_time)
+
+                try:
+                    verify_prepared_file()
+                    if not force_upload:
+                        report("checking")
+                        progress.update(task_id=file_progress_id, description=f"Checking: {file_path.name}")
+                        if remote_media_key := self.api.find_remote_media_by_hash(hash_bytes):
+                            report("skipped", file_size)
+                            if delete_from_host:
+                                self.logger.info(f"{file_path} deleting from host")
+                                file_path.unlink()
+                            return {file_path.absolute().as_posix(): remote_media_key}
+
+                    upload_token = self.api.get_upload_token(hash_b64, file_size)
+                    progress.reset(task_id=file_progress_id)
+                    progress.update(task_id=file_progress_id, description=f"Uploading: {file_path.name}")
+                    with progress.open(file_path, "rb", task_id=file_progress_id) as file:
+                        verify_prepared_file()
+                        report("uploading")
+                        upload_response = self.api.upload_file(file=_ProgressReader(file, file_size, lambda completed, _total: report("uploading", completed)), upload_token=upload_token)
+                    verify_prepared_file()
+                    report("finalizing", file_size)
+                    progress.update(task_id=file_progress_id, description=f"Finalizing Upload: {file_path.name}")
+                    last_modified_timestamp = int(file_path.stat().st_mtime)
+                    model = "Pixel XL"
+                    quality = "original"
+                    if saver:
+                        quality = "saver"
+                        model = "Pixel 2"
+                    if use_quota:
+                        model = "Pixel 8"
+                    media_key = self.api.commit_upload(
+                        upload_response_decoded=upload_response,
+                        file_name=effective_filename,
+                        sha1_hash=hash_bytes,
+                        upload_timestamp=last_modified_timestamp,
+                        model=model,
+                        quality=quality,
+                    )
+
+                    # Record the uploaded file in local remote_media cache database
+                    try:
+                        mimetype, _ = mimetypes.guess_type(file_path)
+                        is_video = mimetype and mimetype.startswith("video/")
+                        item_type = 2 if is_video else 1
+
+                        new_item = MediaItem(
+                            media_key=media_key,
+                            file_name=effective_filename,
+                            dedup_key="",
+                            is_canonical=True,
+                            type=item_type,
+                            caption="",
+                            collection_id="",
+                            size_bytes=file_size,
+                            quota_charged_bytes=0,
+                            origin="",
+                            content_version=1,
+                            utc_timestamp=last_modified_timestamp,
+                            server_creation_timestamp=last_modified_timestamp,
+                        )
+                        with Storage(self.db_path) as storage:
+                            storage.update([new_item])
+                    except Exception as db_err:
+                        self.logger.debug(f"Failed to record uploaded media in database cache: {db_err}")
+
+                    # Delete file immediately after successful upload if requested
                     if delete_from_host:
                         self.logger.info(f"{file_path} deleting from host")
                         file_path.unlink()
-                    return {file_path.absolute().as_posix(): remote_media_key}
 
-            upload_token = self.api.get_upload_token(hash_b64, file_size)
-            progress.reset(task_id=file_progress_id)
-            progress.update(task_id=file_progress_id, description=f"Uploading: {file_path.name}")
-            with progress.open(file_path, "rb", task_id=file_progress_id) as file:
-                report("uploading")
-                upload_response = self.api.upload_file(file=_ProgressReader(file, file_size, lambda completed, _total: report("uploading", completed)), upload_token=upload_token)
-            report("finalizing", file_size)
-            progress.update(task_id=file_progress_id, description=f"Finalizing Upload: {file_path.name}")
-            last_modified_timestamp = int(file_path.stat().st_mtime)
-            model = "Pixel XL"
-            quality = "original"
-            if saver:
-                quality = "saver"
-                model = "Pixel 2"
-            if use_quota:
-                model = "Pixel 8"
-            media_key = self.api.commit_upload(
-                upload_response_decoded=upload_response,
-                file_name=effective_filename,
-                sha1_hash=hash_bytes,
-                upload_timestamp=last_modified_timestamp,
-                model=model,
-                quality=quality,
-            )
-
-            # Record the uploaded file in local remote_media cache database
-            try:
-                mimetype, _ = mimetypes.guess_type(file_path)
-                is_video = mimetype and mimetype.startswith("video/")
-                item_type = 2 if is_video else 1
-
-                new_item = MediaItem(
-                    media_key=media_key,
-                    file_name=effective_filename,
-                    dedup_key="",
-                    is_canonical=True,
-                    type=item_type,
-                    caption="",
-                    collection_id="",
-                    size_bytes=file_size,
-                    quota_charged_bytes=0,
-                    origin="",
-                    content_version=1,
-                    utc_timestamp=last_modified_timestamp,
-                    server_creation_timestamp=last_modified_timestamp,
-                )
-                with Storage(self.db_path) as storage:
-                    storage.update([new_item])
-            except Exception as db_err:
-                self.logger.debug(f"Failed to record uploaded media in database cache: {db_err}")
-
-            # Delete file immediately after successful upload if requested
-            if delete_from_host:
-                self.logger.info(f"{file_path} deleting from host")
-                file_path.unlink()
-
-            report("complete", file_size)
-            return {file_path.absolute().as_posix(): media_key}
-        except Exception as e:
-            self.logger.error(f"Error uploading file {file_path}: {e}")
-            self._log_failed_or_skipped(file_path.absolute().as_posix(), "FAIL", str(e))
-            raise
+                    report("complete", file_size)
+                    return {file_path.absolute().as_posix(): media_key}
+                except (FileNotFoundError, KeyboardInterrupt, SystemExit):
+                    raise
+                except Exception as e:
+                    last_exception = e
+                    if attempt < max_attempts - 1:
+                        continue
+                    self.logger.error(f"Error uploading file {file_path} after {max_attempts} attempts: {e}")
+                    self._log_failed_or_skipped(file_path.absolute().as_posix(), "FAIL", str(e))
+                    raise
         finally:
             progress.update(file_progress_id, visible=False)
 
@@ -352,7 +417,8 @@ class Client:
             hash_bytes,
         )
 
-    def _handle_album_creation(self, results: dict[str, str], album_name: str, show_progress: bool) -> None:
+    def _handle_album_creation(self, results: dict[str, str], album_name: str, show_progress: bool,
+                               on_progress: Callable[[int, int], None] | None = None) -> None:
         """
         Handle album creation based on the provided album_name.
 
@@ -364,7 +430,11 @@ class Client:
         if album_name != "AUTO":
             # Add all media keys to the specified album
             media_keys = list(results.values())
+            if on_progress:
+                on_progress(0, 1)
             self.add_to_album(media_keys, album_name, show_progress=show_progress)
+            if on_progress:
+                on_progress(1, 1)
             return
 
         # Group media keys by the full path of their parent directory
@@ -375,9 +445,14 @@ class Client:
                 media_keys_by_album[parent_dir] = []
             media_keys_by_album[parent_dir].append(media_key)
 
-        for parent_dir, media_keys in media_keys_by_album.items():
+        total_albums = len(media_keys_by_album)
+        if on_progress:
+            on_progress(0, total_albums)
+        for index, (parent_dir, media_keys) in enumerate(media_keys_by_album.items(), 1):
             album_name_from_path = Path(parent_dir).name  # Use the directory name as the album name
             self.add_to_album(media_keys, album_name_from_path, show_progress=show_progress)
+            if on_progress:
+                on_progress(index, total_albums)
 
     @staticmethod
     def _filter_files(expression: str, filter_exclude: bool, filter_regex: bool, filter_ignore_case: bool, filter_path: bool, paths: list[Path]) -> list[Path]:
@@ -430,6 +505,8 @@ class Client:
         filter_path: bool = False,
         skip_existing_filenames: bool = False,
         progress_callback: ProgressCallback | None = None,
+        auto_retries: int = 3,
+        retry_delay: float = 2.0,
     ) -> dict[str, str]:
         """
         Upload one or more files or directories to Google Photos.
@@ -516,12 +593,23 @@ class Client:
             delete_from_host=delete_from_host,
             skip_existing_filenames=skip_existing_filenames,
             progress_callback=progress_callback,
+            auto_retries=auto_retries,
+            retry_delay=retry_delay,
         )
 
-        if album_id:
+        def report_archiving(completed: int, total: int) -> None:
+            if progress_callback:
+                progress_callback({
+                    "version": 1, "type": "progress", "operation": "upload",
+                    "phase": "archiving", "phase_processed": completed, "phase_total": total,
+                })
+
+        if results and album_id:
+            report_archiving(0, 1)
             self.add_to_existing_album(list(results.values()), album_id, show_progress)
-        elif album_name:
-            self._handle_album_creation(results, album_name, show_progress)
+            report_archiving(1, 1)
+        elif results and album_name:
+            self._handle_album_creation(results, album_name, show_progress, report_archiving)
 
         return results
 
@@ -603,7 +691,7 @@ class Client:
         if path.is_file():
             if any(mimetype_guess is not None and mimetype_guess.startswith(mimetype) for mimetype in self.valid_mimetypes if (mimetype_guess := mimetypes.guess_type(path)[0])):
                 return [path]
-            raise ValueError("File's mime type does not match image or video mime type.")
+            return []
 
         if not path.is_dir():
             raise ValueError("Invalid path. Please provide a file or directory path.")
@@ -650,6 +738,8 @@ class Client:
         delete_from_host: bool,
         skip_existing_filenames: bool = False,
         progress_callback: ProgressCallback | None = None,
+        auto_retries: int = 3,
+        retry_delay: float = 2.0,
     ) -> dict[str, str]:
         """
         Upload files concurrently to Google Photos.
@@ -704,6 +794,26 @@ class Client:
                 if effective_filename in existing_filenames or effective_filename in seen_in_batch:
                     self.logger.warning(f"Filename '{effective_filename}' already exists in destination. Skipping file: {path.name}")
                     self._log_failed_or_skipped(path.absolute().as_posix(), "SKIP", "Filename already exists in destination")
+                    if progress_callback:
+                        try:
+                            f_size = path.stat().st_size if path.exists() else 0
+                        except Exception:
+                            f_size = 0
+                        try:
+                            progress_callback(
+                                {
+                                    "version": 1,
+                                    "type": "progress",
+                                    "operation": "upload",
+                                    "phase": "skipped",
+                                    "path": path.absolute().as_posix(),
+                                    "filename": effective_filename,
+                                    "bytes_completed": f_size,
+                                    "bytes_total": f_size,
+                                }
+                            )
+                        except Exception as p_err:
+                            self.logger.warning(f"Progress callback failed: {p_err}")
                 else:
                     seen_in_batch.add(effective_filename)
                     filtered_pairs[path] = value
@@ -759,6 +869,8 @@ class Client:
                         filename=filename,
                         skip_existing_filenames=skip_existing_filenames,
                         progress_callback=progress_callback,
+                        auto_retries=auto_retries,
+                        retry_delay=retry_delay,
                     )
                 ] = (path, value)
             for future in as_completed(futures):
@@ -770,6 +882,10 @@ class Client:
                     if progress_callback:
                         failed_path = Path(target[0])
                         try:
+                            f_size = failed_path.stat().st_size if failed_path.exists() else 0
+                        except Exception:
+                            f_size = 0
+                        try:
                             progress_callback(
                                 {
                                     "version": 1,
@@ -779,7 +895,8 @@ class Client:
                                     "path": failed_path.absolute().as_posix(),
                                     "filename": failed_path.name,
                                     "bytes_completed": 0,
-                                    "bytes_total": failed_path.stat().st_size,
+                                    "bytes_total": f_size,
+                                    "error": str(e),
                                 }
                             )
                         except Exception as error:

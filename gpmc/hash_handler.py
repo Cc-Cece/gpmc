@@ -11,6 +11,7 @@ def calculate_sha1_hash(
     progress: Progress,
     file_progress_id: TaskID,
     on_progress: Callable[[int, int], None] | None = None,
+    expected_sha256: str | None = None,
 ) -> tuple[bytes, str]:
     """
     Calculate the SHA1 hash of a file in chunks, with progress tracking.
@@ -26,6 +27,7 @@ def calculate_sha1_hash(
     progress.update(task_id=file_progress_id, description=f"Calculating Hash: {file_path.name}")
 
     hash_sha1 = hashlib.sha1()
+    hash_sha256 = hashlib.sha256() if expected_sha256 else None
     total_bytes = file_path.stat().st_size
     completed_bytes = 0
 
@@ -35,9 +37,14 @@ def calculate_sha1_hash(
     with progress.open(file_path, "rb", task_id=file_progress_id) as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
             hash_sha1.update(chunk)
+            if hash_sha256 is not None:
+                hash_sha256.update(chunk)
             completed_bytes += len(chunk)
             if on_progress:
                 on_progress(completed_bytes, total_bytes)
+
+    if hash_sha256 is not None and hash_sha256.hexdigest().lower() != expected_sha256.lower():
+        raise ValueError(f"File content no longer matches the prepared upload plan: {file_path}")
 
     hash_bytes = hash_sha1.digest()
     hash_b64 = base64.b64encode(hash_bytes).decode("utf-8")
