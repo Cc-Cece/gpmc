@@ -10,7 +10,7 @@ gpmc = ["NOTICE.md", "_licenses/*.txt"]
 
 [project]
 name = "gpmc"
-version = "0.9.1.dev0"
+version = "0.10.0"
 description = "Google Photos Mobile Client based on the reverse-engineered mobile API."
 authors = [{ name = "xob0t" }]
 readme = "README.md"
