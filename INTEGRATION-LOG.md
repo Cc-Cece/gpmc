@@ -57,15 +57,56 @@ UI、相册系统接口、原生后台传输、任务数据库、账户生命周
 
 构建配置将 setuptools 下限修正为 77.0.3，以匹配现有 SPDX 许可元数据和 `license-files` 用法，依据 [setuptools 官方配置说明](https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html)。旧本地 setuptools 的无隔离构建曾失败，采用声明的构建依赖隔离后通过；不是忽略失败。
 
-尚未执行：本机为 Windows，没有 macOS/Xcode，未构建本次代码的 IPA，也未进行 iOS 原生回归；未安装新 APK 覆盖用户应用；未使用真实 Google 账户执行上传、清理、Live Photo 配对及后台恢复验收。新增的核心 CI 工作流尚未推送运行。上述限制不得表述为已完成。
+本阶段结束时的限制：本机为 Windows，没有 macOS/Xcode，当时尚未构建 IPA 或执行 iOS 原生回归，核心 CI 也尚未推送运行。后续云端构建、原生回归与合并结果见 GPMC-002；未安装新 APK 覆盖用户应用，未使用真实 Google 账户执行上传、清理、Live Photo 配对及后台恢复验收。
 
 本地 Android APK 是验证产物，仍使用当前开发版本号，没有重新发布 beta.5 或改变现有 Release。后续正式发布需按各端正常版本流程处理。
 
 
 ## 2026-11-12：任务 GPMC-002 — 提交审核、限定范围合并与构建完善
 
+收尾状态：根据用户“只做必要的”指示停止继续扩大排查。中央库、安卓和电脑端已合并；iOS 已提交并保留 PR，最新 CI 尚在运行，未合并，也未标记全部完成。后续只需查看最新 CI，处理仍实际阻塞的项目后再合并 iOS。
+
 用户明确本次仅合并 gpmc 改动到各端原功能分支，不将既有未合并功能并入 main。中央库目标为 main；安卓目标为 feat/android-diagnostics；iOS 和电脑目标为 feat/paired-backup-scope。
 
 审核修复：电脑 ZIP 与源码桥按 LF 归一化比较，避免跨系统误报；安卓源码 ZIP 增加根来源锁；桌面 CI 明确 Python 版本并执行适配检查；iOS PR 同时验证模拟器和无签名 IPA；中央库 CI 检查跨系统 Python 契约及 wheel/sdist 内容。
 
-执行结果及 PR 链接将在检查完成后补充。
+本次审核为实现者自审，在各 PR 留下了绑定具体提交的 COMMENT 审核记录，不冒充独立维护者批准。审核后发现的问题均通过修复和重新运行检查处理，未跳过失败的功能测试。
+
+### PR 与限定范围合并
+
+| 仓库 | PR | 合并目标 | 结果 |
+| --- | --- | --- | --- |
+| 中央 gpmc | [#1](https://github.com/Cc-Cece/gpmc/pull/1) | `main` | 已合并，`c33e3bbf14b002c48717f60d5c2c6bf98891bea8` |
+| 安卓 | [#3](https://github.com/Cc-Cece/PicHarbor-Android/pull/3) | `feat/android-diagnostics` | 已合并，`4d4150bcf197f20750a248073713844739fc32bf` |
+| 电脑 | [#13](https://github.com/Cc-Cece/PicHarbor/pull/13) | `feat/paired-backup-scope` | 已合并，`a4b687688e245f60f8149c9a3e1d09471925109d` |
+| iOS | [#2](https://github.com/Cc-Cece/PicHarbor-iOS/pull/2) | `feat/paired-backup-scope` | 待合并；最新提交 `90ac7e16130ecdfb4845bc86225c23a1e65698f9`，CI 运行中 |
+
+三个客户端的 main 与原有功能 PR 均未由本任务合并。没有发布新应用版本，也没有发布 PyPI 版本。安卓手动测试构建的发布步骤已确认跳过；公开 beta.5 APK 的 SHA-256 仍为 `30f4fb518280a60dab97f4bbfc946db7fbe54569ded23ef9e5ccd5491d9cff6b`。
+
+### 构建流程与审核修复
+
+- 中央库：Linux/Windows × Python 3.11/3.13 契约检查，以及 wheel/sdist 构建、包内容与许可元数据检查。
+- 安卓：不需要发布密钥的 PR 构建检查；手动签名构建默认只上传构建产物，公开发布需明确选择，标签必须匹配应用版本，拒绝覆盖已有 Release。
+- 安卓：源码 ZIP 包含根来源锁，并在临时目录解压后独立运行验证；新 Windows 检出的 LICENSE 也固定为基线需要的 LF 格式。
+- 安卓：重新生成过期的 Debug 依赖锁。核对 Release 编译与运行依赖的版本没有变化，保留完整依赖锁定。
+- 电脑：构建与发布 CI 明确 Python 环境，并执行适配契约。PR 格式检查针对本 PR 修改的 C#；整体构建与功能测试仍完整执行，主分支格式检查仍为全量。
+- 电脑：密钥扫描仅精确排除已核实的公开 SHA-256 行与三个本地化资源标识；新增生成式假凭据检查，确认实际凭据形态仍被检测。
+- 电脑：修正旧测试夹具未显式对齐文件时间、导致受 CI 调度延迟影响的问题，原有判定和断言保留；为 Vault 测试项目补齐已有 CI 使用的日志组件。
+- iOS：PR 增加无签名 IPA 构建和包内源码检查；堆叠 PR 也运行模拟器检查。移除测试目标对宿主已静态链接的 SelfRefreshKit 的重复链接，修复 SideSign 重复链接错误。
+- iOS：针对模拟器冷构建长时间没有进度的问题，将 build-for-testing 与 test-without-building 分开，编译阶段限制并发并关闭索引存储；编译完成后才启动模拟器。完整输出保存在构建产物中，每分钟输出进度与 CPU/内存摘要，分阶段设定超时。日志包装器已验证保留真实成功/失败退出码，不缩减完整测试范围。
+- iOS：原始测试日志定位到应用启动缺失 `/usr/lib/swift/libswiftWebKit.dylib`：Xcode 26 SDK 被配到了列表中较早的 iOS 18.5 模拟器。增加 SDK/运行时匹配选择，禁止默默选择旧运行时，未匹配时提前失败；三个回归用例覆盖旧运行时在前、无匹配项、不可用/非手机设备。
+- 四仓库工作流均通过本地 actionlint，三端干净检出验证与来源锁一致性均通过。
+- iOS：匹配运行时后完整测试实际执行 149 项，暴露二维码识别与归档输入失败；二维码夹具补齐四模块留白和软件渲染，归档输入改为右侧编辑区域选中数字替换，并直接断言输入值，保留原业务断言。iOS 26.2 模拟器仍出现 Vision 推理编译错误和授权 UI 不稳定，后续运行还触及 15 分钟上限；IPA 固定 Xcode 26.3，完整原生回归固定 Xcode 16.4，运行时仍匹配 SDK，测试阶段放宽到 25 分钟。不得将此基线通过表述为 iOS 26 真机验证。
+
+### CI 执行证据
+
+| 验证 | 结果与链接 |
+| --- | --- |
+| 中央库跨系统契约及发行包 | [43178157606](https://github.com/Cc-Cece/gpmc/actions/runs/43178157606)，全部通过 |
+| 安卓 PR 验证 | [43179406157](https://github.com/Cc-Cece/PicHarbor-Android/actions/runs/43179406157)，全部通过 |
+| 安卓固定密钥签名预览、APK 与源码 ZIP | [43179503103](https://github.com/Cc-Cece/PicHarbor-Android/actions/runs/43179503103)，通过，公开发布步骤跳过 |
+| 电脑全量 CI | [43180289492](https://github.com/Cc-Cece/PicHarbor/actions/runs/43180289492)，构建/单元测试、EXE E2E、发布包启动、覆盖率与密钥扫描通过 |
+| iOS 原生 IPA 构建及内容检查 | 上轮 [43222248898](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43222248898) 通过；最终工具链固定后的 [43226154463](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43226154463) 收尾时运行中 |
+| iOS 模拟器 | 上轮 [43222248911](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43222248911) 失败并超时，日志用于定位 Vision、输入焦点及授权 UI 问题；修复后的完整 [43226154508](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43226154508) 收尾时运行中，尚不宣称通过 |
+
+仍不属于本次已完成验收：真实 Google 账户操作、真实手机后台恢复及云端 Live Photo 表现。没有卸载用户应用或清除用户数据。
