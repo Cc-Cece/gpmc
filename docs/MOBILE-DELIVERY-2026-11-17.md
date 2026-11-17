@@ -20,6 +20,7 @@
 - APK SHA-256：`5da7fbe997c7580480869690752dc09ebf7026f84bd962f381a8b664a770fc64`
 - Android 源码 ZIP SHA-256：`f4d796624bd500a563aaaca1ffbe9a0df60a6a05ae6de7a14fc4fe3a9729477e`
 - Android 签名证书 SHA-256：`65de9c795940ee1a05dade807814a8e70ca395f6a1ab1e0075faab7cea2133f7`
+- iOS IPA SHA-256：`a6f42ee605b3f142447e311b507f60dde324b910fc8bc3055382e6146792e78b`
 
 iOS IPA 未签名，需要使用者自己的签名流程后安装；本轮没有对 iPhone 执行安装。GitHub 构建产物保留至 2026-12-01，本地副本独立保留。
 
