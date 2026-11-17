@@ -1,6 +1,8 @@
 import io
 import struct
 import unittest
+import tempfile
+from pathlib import Path
 
 from gpmc.harbor_core import create_task, transition, dispatch
 from gpmc.media_identity import apple_photo_id, apple_video_id
@@ -11,6 +13,18 @@ def atom(kind,body):
     return struct.pack('>I',len(body)+8)+kind+body
 
 class MobileContractTests(unittest.TestCase):
+    def test_motion_container_preserves_original_encoded_bytes_and_video(self):
+        from gpmc.motion_photo import mux_jpeg
+        with tempfile.TemporaryDirectory() as folder:
+            photo=Path(folder)/'photo.jpg';video=Path(folder)/'video.mov';target=Path(folder)/'motion.jpg'
+            photo.write_bytes(b'\xff\xd8encoded-original\xff\xd9');video.write_bytes(b'original-video')
+            mux_jpeg(photo,video,target,123456)
+            value=target.read_bytes()
+            self.assertIn(b'encoded-original\xff\xd9',value)
+            self.assertTrue(value.endswith(b'original-video'))
+            self.assertIn(b'MotionPhotoPresentationTimestampUs="123456"',value)
+            self.assertEqual(photo.read_bytes(),b'\xff\xd8encoded-original\xff\xd9')
+            with self.assertRaises(Exception):mux_jpeg(photo,video,Path(folder)/'invalid.jpg',None)
     def task(self):
         return create_task('task',{'local_id':'asset','filename':'photo.jpg','media_kind':'photo',
             'size':20,'sha1':'a'*40,'sha256':'b'*64})['task']
