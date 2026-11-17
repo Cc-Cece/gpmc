@@ -138,10 +138,10 @@ STORE_VERSION = 1
 # Any running state may go to paused / cancelled / failed; failed and
 # interrupted may return to queued for retry; done and cancelled are terminal.
 _ALLOWED = {
-    "queued": {"preparing", "paused", "cancelled", "failed", "waiting_network"},
+    "queued": {"preparing", "paused", "cancelled", "failed", "waiting_network", "confirming"},
     "preparing": {"uploading", "dedup_hit", "paused", "cancelled", "failed",
                   "waiting_network", "interrupted"},
-    "dedup_hit": {"done", "paused", "cancelled", "failed"},
+    "dedup_hit": {"done", "confirming", "paused", "cancelled", "failed"},
     "uploading": {"submitting", "paused", "cancelled", "failed",
                   "waiting_network", "interrupted"},
     "submitting": {"confirming", "paused", "cancelled", "failed",
@@ -359,6 +359,9 @@ def transition(task, to_state, event="transition", error_code=None,
     if cloud_confirmed is not None and type(cloud_confirmed) is not bool:
         return _error("INVALID_ARGUMENT")
     if to_state == "done" and cloud_confirmed is not True and task.get("cloud_confirmed") is not True:
+        return _error("CLOUD_CONFIRMATION_REQUIRED")
+    if current == "queued" and to_state == "confirming" and (
+            task.get("cloud_confirmed") is not True or not task.get("remote_key")):
         return _error("CLOUD_CONFIRMATION_REQUIRED")
 
     updated = dict(task)
