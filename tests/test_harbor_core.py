@@ -68,7 +68,7 @@ def drive(task_dict, *states, **kwargs):
     """Apply transitions in order; assert each succeeds; return the task."""
     current = task_dict
     for state in states:
-        result = transition(current, state, **kwargs)
+        result = transition(current, state, **(dict(kwargs, cloud_confirmed=True) if state == "done" else kwargs))
         assert result.get("ok") is not False, result
         current = result["task"]
     return current
@@ -167,7 +167,7 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(transition(waiting, "queued")["task"]["state"], "queued")
         confirming = drive(task(), "preparing", "uploading", "submitting",
                            "confirming", "waiting_confirmation")
-        self.assertEqual(transition(confirming, "done")["task"]["state"], "done")
+        self.assertEqual(transition(confirming, "done", cloud_confirmed=True)["task"]["state"], "done")
 
 
 class IdempotencyTests(unittest.TestCase):
