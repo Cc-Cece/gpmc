@@ -18,7 +18,7 @@ def invalid():
 def box(kind, data):
     if len(data) + 8 > 0xffffffff:
         invalid()
-    return struct.pack('>I4s', len(data) + 8, kind) + data
+    return struct.pack('>I4s', len(data) + 8, kind) + bytes(data)
 
 
 def boxes(data, start=0):
@@ -169,8 +169,12 @@ class HeifMetadata:
             width = 4 if data[0] == 3 else 2
             identifier = int.from_bytes(data[4:4 + width], 'big')
             self.ids.add(identifier)
-            if data[0] >= 2 and data[6 + width:10 + width] == b'mime':
+            fields = None
+            if data[0] <= 1:
+                fields = data[8:].split(b'\x00')
+            elif data[6 + width:10 + width] == b'mime':
                 fields = data[10 + width:].split(b'\x00')
+            if fields is not None:
                 if len(fields) >= 2 and fields[1] == b'application/rdf+xml':
                     if self.xmp_id is not None:
                         invalid()
