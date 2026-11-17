@@ -27,10 +27,12 @@ def _video_mime(path):
 
 
 def _packet(keyframe_us, length, mime, padding, video_mime):
+    legacy = (f' Camera:MicroVideo="1" Camera:MicroVideoVersion="1" Camera:MicroVideoOffset="{length}"'
+              f' Camera:MicroVideoPresentationTimestampUs="{keyframe_us}"') if mime == 'image/jpeg' else ''
     return (f'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
         f'<rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" '
         f'xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" '
-        f'Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1" Camera:MotionPhotoPresentationTimestampUs="{keyframe_us}">'
+        f'Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1" Camera:MotionPhotoPresentationTimestampUs="{keyframe_us}"{legacy}>'
         f'<Container:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="{mime}" Item:Semantic="Primary" Item:Padding="{padding}"/></rdf:li>'
         f'<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="{video_mime}" Item:Semantic="MotionPhoto" Item:Length="{length}"/></rdf:li>'
         f'</rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>').encode()
@@ -158,17 +160,51 @@ def mux_jpeg(photo, video, destination, keyframe_us):
     with photo.open('rb') as source:
         if source.read(2) != b'\xff\xd8':
             raise ProtocolError('MOTION_FORMAT_UNSUPPORTED')
-        packet = (f'<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
-            f'<rdf:Description xmlns:Camera="http://ns.google.com/photos/1.0/camera/" xmlns:GCamera="http://ns.google.com/photos/1.0/camera/" '
-            f'xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" '
-            f'Camera:MotionPhoto="1" Camera:MotionPhotoVersion="1" Camera:MotionPhotoPresentationTimestampUs="{keyframe_us}" '
-            f'GCamera:MicroVideo="1" GCamera:MicroVideoVersion="1" GCamera:MicroVideoOffset="{length}" GCamera:MicroVideoPresentationTimestampUs="{keyframe_us}">'
-            f'<Container:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="image/jpeg" Item:Semantic="Primary" Item:Padding="0"/></rdf:li>'
-            f'<rdf:li rdf:parseType="Resource"><Container:Item Item:Mime="video/quicktime" Item:Semantic="MotionPhoto" Item:Length="{length}"/></rdf:li>'
-            f'</rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>').encode()
-        payload = b'http://ns.adobe.com/xap/1.0/\x00' + packet
+        signature = b'http://ns.adobe.com/xap/1.0/\x00'
+        segments, existing, total = [], b'', 0
+        while True:
+            start = source.tell()
+            marker = source.read(2)
+            if len(marker) != 2 or marker[0] != 255:
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            while marker[-1] == 255:
+                following = source.read(1)
+                if len(following) != 1 or len(marker) >= 32:
+                    raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+                marker += following
+            code = marker[-1]
+            if code in (0xda, 0xd9):
+                source.seek(start)
+                break
+            if code in (0, 1, 0xd8) or 0xd0 <= code <= 0xd7:
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            raw_length = source.read(2)
+            if len(raw_length) != 2:
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            size = int.from_bytes(raw_length, 'big')
+            if size < 2:
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            data = source.read(size - 2)
+            total += size + len(marker)
+            if len(data) != size - 2 or total > 16 * 1024 * 1024:
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            if code == 0xe1 and data.startswith(b'http://ns.adobe.com/xmp/extension/\x00'):
+                raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+            if code == 0xe1 and data.startswith(signature):
+                if existing:
+                    raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
+                existing = data[len(signature):]
+            else:
+                segments.append(marker + raw_length + data)
+        packet = _merge_xmp(existing, _packet(keyframe_us, length, 'image/jpeg', 0, _video_mime(video)))
+        payload = signature + packet
+        if len(payload) + 2 > 65535:
+            raise ProtocolError('MOTION_METADATA_UNSUPPORTED')
         with destination.open('xb') as output:
-            output.write(b'\xff\xd8\xff\xe1'+struct.pack('>H',len(payload)+2)+payload)
+            output.write(b'\xff\xd8')
+            for segment in segments:
+                output.write(segment)
+            output.write(b'\xff\xe1'+struct.pack('>H',len(payload)+2)+payload)
             shutil.copyfileobj(source,output,1024*1024)
             with video.open('rb') as movie:shutil.copyfileobj(movie,output,1024*1024)
     return destination
