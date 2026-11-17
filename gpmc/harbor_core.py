@@ -97,6 +97,7 @@ ACTIONS = (
     "validate_proxy",
     "select_proxy",
     "select_versions",
+    "resolve_pipeline",
     "livelink_handshake",
     "livelink_scope",
     "retry_delay",
@@ -1382,6 +1383,9 @@ def _dispatch_value(action, value):
     if action == "select_versions":
         from .media_versions import select_versions
         return select_versions(value)
+    if action == "resolve_pipeline":
+        from .pipeline_policy import resolve_pipeline
+        return resolve_pipeline(value)
     if value is None:
         value = {}
     if not isinstance(value, dict):
