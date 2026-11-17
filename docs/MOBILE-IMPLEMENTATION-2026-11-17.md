@@ -1,5 +1,7 @@
 # 2026-11-17 移动端统一实施记录
 
+本文件为首轮实现与交付的历史记录。后续用户要求提高框架一致度、合并移动仓库并确认了左右对照预览；当前实现与验收入口转至 [PicHarbor-Mobile/specs](https://github.com/Cc-Cece/PicHarbor-Mobile/tree/feat/mobile-framework-parity/specs)。
+
 规范入口：[MOBILE-PRODUCT-CONTRACT.md](MOBILE-PRODUCT-CONTRACT.md)。三仓实施分支均为 `feat/mobile-product-unification`。
 
 ## 交付状态
