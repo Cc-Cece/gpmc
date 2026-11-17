@@ -137,7 +137,12 @@ def has_embedded_motion(path):
             camera = '{http://ns.google.com/photos/1.0/camera/}'
             item = '{http://ns.google.com/photos/1.0/container/item/}'
             for node in root.iter():
-                attributes = node.attrib
+                attributes = dict(node.attrib)
+                if node.tag.startswith(camera):
+                    attributes[node.tag] = (node.text or '').strip()
+                for child in node:
+                    if child.tag.startswith(item):
+                        attributes[child.tag] = (child.text or '').strip()
                 if camera + 'MotionPhoto' in attributes:
                     modern.append(attributes[camera + 'MotionPhoto'])
                 enabled = enabled or attributes.get(camera + 'MotionPhoto') == '1' or attributes.get(camera + 'MicroVideo') == '1'
