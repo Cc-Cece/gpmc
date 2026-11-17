@@ -42,6 +42,7 @@
   Live Photo 必须确认两资源指向同一云端项目；同名、近似时间、两个独立文件上传成功均不是配对证明。
 - 新增 `select_proxy`：只接受不含秘密的节点名称、可用性、延时和策略，返回 node/direct/waiting。
   明确允许直连时才可直连，正常连接优先保持；失败节点按健康数据切换。
+- 新增 `select_versions`：输入 policy（both/original/current）、available（平台明确提供的版本列表）和 has_edits（true/false/null），输出 versions。不能把当前文件冒充编辑前原件；已知有编辑但缺少所选资源时明确失败。未知编辑历史时 both 保留所有可用版本。
 - `Api.upload_file(...,raw_response=True)` 可取得未经重构的上传响应，默认仍返回原有解码结果。
   配对提交保留原始响应及提交前持久化标记，未知提交结果先查询，不能盲目重交。
 - 核心决策无状态；客户端原生数据库保存权威快照，原生任务表为展示/执行投影。
