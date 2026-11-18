@@ -38,6 +38,8 @@ def _catalog(api, db, account):
             if isinstance(collections, dict):
                 collections = [collections]
             for collection in collections:
+                if not isinstance(collection, dict):
+                    continue
                 key, title = collection.get("1"), _get_nested(collection, "2", "5")
                 if isinstance(key, bytes): key = key.decode("utf-8", errors="replace")
                 if isinstance(title, bytes): title = title.decode("utf-8", errors="replace")

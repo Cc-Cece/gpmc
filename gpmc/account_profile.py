@@ -4,11 +4,13 @@ import json
 import re
 from urllib.parse import urlparse
 import requests
+from .deadline import check, current, DeadlineSession
 
 
-def account_profile(api, account, session_factory=requests.Session):
+def account_profile(api, account, session_factory=None):
     def session():
-        value = session_factory()
+        check()
+        value = session_factory() if session_factory else DeadlineSession(current()) if current() else requests.Session()
         value.trust_env = False
         value.verify = True
         value.proxies = {"http": api.proxy, "https": api.proxy}
@@ -19,6 +21,7 @@ def account_profile(api, account, session_factory=requests.Session):
             return None
         result = bytearray()
         for chunk in response.iter_content(8192):
+            check()
             result.extend(chunk)
             if len(result) > limit:
                 return None
