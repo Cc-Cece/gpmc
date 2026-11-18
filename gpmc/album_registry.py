@@ -25,7 +25,15 @@ def _catalog(api, db, account):
     for _ in range(10):
         check_budget()
         page_token = token
-        response = api.get_library_state(token if ready else "")
+        try:
+            response = api.get_library_state(token if ready else "")
+        except requests.HTTPError as error:
+            if ready and error.response is not None and error.response.status_code == 400:
+                # An expired delta token must not permanently block new albums.
+                # Rebuild the catalog before any create; pending fences remain intact.
+                token, ready, values = "", False, {}
+                continue
+            raise
         more = _get_nested(response, "1", "7") == 2
         seen = set()
         while True:

@@ -68,3 +68,15 @@ class AlbumRegistryTests(unittest.TestCase):
         self.api.albums.clear()
         self.ensure(account="two@example.com")
         self.assertEqual(self.api.created, 2)
+    def test_expired_catalog_token_rebuilds_without_duplicate(self):
+        ensure_album(self.api, self.path, "one@example.com", "old", "Old", ["media"])
+        self.api.albums["existing"] = "Camera"
+        original = self.api.get_library_state
+        def state(token):
+            if token:
+                response = requests.Response(); response.status_code = 400
+                raise requests.HTTPError(response=response)
+            return original(token)
+        self.api.get_library_state = state
+        self.assertEqual(self.ensure()["remote_key"], "existing")
+        self.assertEqual(self.api.created, 1)
