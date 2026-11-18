@@ -15,7 +15,7 @@ from gpmc.db_update_parser import parse_db_update, _parse_media_item, _get_neste
 
 class Protocol:
     actions = {"prepare_upload", "commit_resource", "confirm_resource", "sync_cloud",
-               "check_cleanup", "create_album", "add_to_album", "pair_apple", "confirm_pair", "prepare_pair_component", "commit_pair_photo", "motion_status"}
+               "check_cleanup", "create_album", "add_to_album", "pair_apple", "confirm_pair", "prepare_pair_component", "commit_pair_photo", "motion_status", "ensure_album", "account_profile"}
 
     def __init__(self, service):
         self.service = service
@@ -43,6 +43,13 @@ class Protocol:
 
     def dispatch(self, action, value):
         from .exceptions import ProtocolError as Failure
+        if action == "ensure_album":
+            from pathlib import Path
+            from .album_registry import ensure_album
+            return ensure_album(self.api, Path(self.service.staging).parent / "album-registry.sqlite3", value.get("account"), value.get("local_id"), value.get("title"), value.get("keys"), value.get("remote_key", ""))
+        if action == "account_profile":
+            from .account_profile import account_profile
+            return account_profile(self.api, value.get("account", ""))
         if action in ("pair_apple", "confirm_pair"):
             if not isinstance(value.get("photo"), dict) or not isinstance(value.get("video"), dict):
                 raise Failure("INVALID_PAIR_RESOURCES")

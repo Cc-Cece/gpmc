@@ -110,3 +110,10 @@ UI、相册系统接口、原生后台传输、任务数据库、账户生命周
 | iOS 模拟器 | 上轮 [43222248911](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43222248911) 失败并超时，日志用于定位 Vision、输入焦点及授权 UI 问题；修复后的完整 [43226154508](https://github.com/Cc-Cece/PicHarbor-iOS/actions/runs/43226154508) 收尾时运行中，尚不宣称通过 |
 
 仍不属于本次已完成验收：真实 Google 账户操作、真实手机后台恢复及云端 Live Photo 表现。没有卸载用户应用或清除用户数据。
+
+
+## 2026-11-18: durable mobile album organization and optional account avatars
+
+Added account-scoped album assignment journal with persisted pre-submit fences, remote catalog reconciliation, legacy mapping adoption and ambiguous-title rejection. Shared optional profile/avatar fetching uses the configured proxy and bounded HTTPS requests; image requests use a separate session without bearer headers. Native clients own image validation, storage and UI. No wire payload or cloud deletion changes.
+
+Validation: 37 offline checks passed, including 9 new tests for concurrent/repeated album assignment, account isolation, lost create responses, pending-create fences, profile proxy routing, image identity isolation and bounded data. No live cloud writes were used. Simultaneous creation on different devices cannot be made globally atomic by the provider API.
