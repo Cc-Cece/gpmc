@@ -64,7 +64,7 @@ def plan_live(value):
         warning = "MOTION_STRUCTURE_UNKNOWN"
     embedded = [r for r in normalized if r.get("embedded_motion") is True and not r["video"]]
     if embedded and len(embedded) == len(normalized):
-        return _result(requested, "motion_photo", "raw", warning, normalized, [])
+        return _result(requested, "motion_photo", "raw", "", normalized, [])
     if embedded and len(embedded) != len(normalized):
         warning = warning or "LIVE_MIXED_REPRESENTATIONS"
     kind = "video" if all(r["video"] for r in normalized) else "photo" if all(not r["video"] for r in normalized) and not warning else "raw_resources"
