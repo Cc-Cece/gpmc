@@ -7,5 +7,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 names = ["tests.media_key_decode_test", "tests.upload_features_test", "tests.test_prepared_upload", "tests.test_unified_core", "tests.test_snapshot_lock"]
 names += ["tests.test_album_registry", "tests.test_account_profile"]
+names += ["tests.test_live_plan"]
 suite = unittest.defaultTestLoader.loadTestsFromNames(names)
 sys.exit(not unittest.TextTestRunner(verbosity=2).run(suite).wasSuccessful())

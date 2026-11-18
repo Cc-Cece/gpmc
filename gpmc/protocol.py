@@ -15,7 +15,7 @@ from gpmc.db_update_parser import parse_db_update, _parse_media_item, _get_neste
 
 class Protocol:
     actions = {"prepare_upload", "commit_resource", "confirm_resource", "sync_cloud",
-               "check_cleanup", "create_album", "add_to_album", "pair_apple", "confirm_pair", "prepare_pair_component", "commit_pair_photo", "motion_status", "ensure_album", "account_profile"}
+               "check_cleanup", "create_album", "add_to_album", "pair_apple", "confirm_pair", "prepare_pair_component", "commit_pair_photo", "motion_status", "ensure_album", "account_profile", "plan_live"}
 
     def __init__(self, service):
         self.service = service
@@ -43,6 +43,24 @@ class Protocol:
 
     def dispatch(self, action, value):
         from .exceptions import ProtocolError as Failure
+        if action == "plan_live":
+            from pathlib import Path
+            from .live_plan import plan_live, inspect_resource
+            values = dict(value)
+            resources = []
+            supplied = value.get("resources")
+            if not isinstance(supplied, list) or any(not isinstance(r, dict) for r in supplied):
+                raise Failure("INVALID_LIVE_PLAN")
+            for resource in supplied:
+                source = dict(resource)
+                if "path" in source:
+                    path = Path(source.pop("path")).resolve()
+                    if not path.is_relative_to(Path(self.service.staging).resolve()):
+                        raise Failure("INVALID_LIVE_PLAN")
+                    source.update(inspect_resource(path, source.get("video", False)))
+                resources.append(source)
+            values["resources"] = resources
+            return plan_live(values)
         if action == "ensure_album":
             from pathlib import Path
             from .album_registry import ensure_album
