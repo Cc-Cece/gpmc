@@ -21,6 +21,9 @@ class LivePlanTests(unittest.TestCase):
     def test_names_and_times_cannot_establish_pair(self):
         result = plan_live({"resources": [self.source("a", name="same.jpg", captured=100), self.source("b", True, name="same.mov", captured=100)]})
         self.assertNotEqual(result["kind"], "apple_pair")
+    def test_valid_embedded_motion_does_not_require_an_external_partner(self):
+        result = plan_live({"resources": [self.source("m", embedded_motion=True, identifier="pair")]})
+        self.assertEqual((result["kind"], result["strategy"], result["warning"]), ("motion_photo", "raw", ""))
     def test_missing_or_ambiguous_parts_keep_files_with_warning(self):
         resource = self.source("a", identifier="pair")
         self.assertEqual(plan_live({"resources": [resource]})["warning"], "LIVE_PAIR_INCOMPLETE")
